@@ -33,6 +33,10 @@ LOCATION = "office"
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # seconds
 
+def c_to_f(celsius: float) -> float:
+    """Convert Celsius to Fahrenheit"""
+    return celsius * 9.0 / 5.0 + 32.0
+
 def validate_environment():
     """Validate required environment variables and configuration"""
     if not INFLUX_TOKEN:
@@ -49,10 +53,8 @@ def get_aranet_readings_with_retry():
         try:
             logger.info(f"Attempting to read from Aranet4 (attempt {attempt + 1}/{MAX_RETRIES})")
             current = aranet4.client.get_current_readings(ARANET_MAC)
-            temp_c = current.temperature
-            temp_f = c_to_f(temp_c)
             
-            # Validate readings
+            # Validate readings (using Celsius for validation)
             if current.co2 <= 0 or current.temperature < -50 or current.temperature > 80:
                 raise ValueError(f"Invalid sensor readings: CO2={current.co2}, Temp={current.temperature}")
             
@@ -68,7 +70,7 @@ def get_aranet_readings_with_retry():
                 logger.error(f"All {MAX_RETRIES} attempts failed")
                 raise
 
-def write_to_influx_with_retry(current):
+def write_to_influx_with_retry(current, temp_f):
     """Write data to InfluxDB with retry logic"""
     for attempt in range(MAX_RETRIES):
         try:
@@ -84,7 +86,7 @@ def write_to_influx_with_retry(current):
                 .tag("location", LOCATION) \
                 .tag("mac_address", ARANET_MAC) \
                 .field("co2", int(current.co2)) \
-                .field("temperature_f", temp_f) \
+                .field("temperature_f", float(temp_f)) \
                 .field("humidity", int(current.humidity)) \
                 .field("pressure", float(current.pressure)) \
                 .field("battery", int(current.battery)) \
@@ -128,8 +130,12 @@ def log_aranet_data():
         # Get sensor readings
         current = get_aranet_readings_with_retry()
         
+        # Convert temperature to Fahrenheit
+        temp_c = current.temperature
+        temp_f = c_to_f(temp_c)
+        
         # Write to InfluxDB
-        write_to_influx_with_retry(current)
+        write_to_influx_with_retry(current, temp_f)
         
         # Success message
         elapsed_time = time.time() - start_time
@@ -140,9 +146,6 @@ def log_aranet_data():
         return 1  # Exit code for cron monitoring
     
     return 0
-
-def c_to_f(celsius: float) -> float:
-    return celsius * 9.0 / 5.0 + 32.0
 
 if __name__ == "__main__":
     exit_code = log_aranet_data()

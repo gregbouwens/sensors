@@ -1,2 +1,3 @@
 aranet_env/
-aranet_logger.log
+*.log
+*.csv
