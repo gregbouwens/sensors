@@ -12,7 +12,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/home/greg/repos/aranet4/aranet_logger.log'),
+        logging.FileHandler('/home/greg/repos/sensors/aranet_logger.log'),
         logging.StreamHandler()
     ]
 )
