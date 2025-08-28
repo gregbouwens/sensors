@@ -18,3 +18,6 @@ trust XX:XX:XX:XX:XX:XX
 
 # Exit bluetoothctl
 exit
+
+## InfluxDB
+pip3 install 'influxdb-client[ciso]'
