@@ -48,7 +48,9 @@ def get_historical_data():
         logger.info(f"Connecting to Aranet4 device: {ARANET_MAC}")
         
         # Get all historical records from the device
-        history = aranet4.client.get_all_records(ARANET_MAC)
+        # entry_filter is a dictionary - empty dict or with 'last' key to get all records
+        entry_filter = {}  # Get all available records
+        history = aranet4.client.get_all_records(ARANET_MAC, entry_filter=entry_filter)
         
         logger.info(f"Retrieved {len(history.value)} historical records")
         return history.value
@@ -77,6 +79,7 @@ def write_historical_to_influx(records):
             temp_f = c_to_f(record.temperature)
             
             # Create data point using the actual timestamp from the device
+            # Note: Historical records don't include battery level
             point = Point("aranet4_readings") \
                 .tag("device", DEVICE_NAME) \
                 .tag("location", LOCATION) \
@@ -85,7 +88,6 @@ def write_historical_to_influx(records):
                 .field("temperature_f", float(temp_f)) \
                 .field("humidity", int(record.humidity)) \
                 .field("pressure", float(record.pressure)) \
-                .field("battery", int(record.battery)) \
                 .time(record.date)  # Use the device's timestamp, not current time
             
             points.append(point)
