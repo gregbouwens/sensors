@@ -21,3 +21,9 @@ exit
 
 ## InfluxDB
 pip3 install 'influxdb-client[ciso]'
+
+## Create venv for Python3
+python3 -m venv sensors_env
+
+## Activate sensors Virtual Environment
+source sensors_env/bin/activate

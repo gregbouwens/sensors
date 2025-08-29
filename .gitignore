@@ -1,3 +1,4 @@
 sensors_env/
 *.log
 *.csv
+.env

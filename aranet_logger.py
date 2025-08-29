@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import aranet4, os
 import datetime
 import logging
@@ -6,28 +7,44 @@ import time
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.client.exceptions import InfluxDBError
+from dotenv import load_dotenv
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/home/greg/repos/sensors/aranet_logger.log'),
-        logging.StreamHandler()
-    ]
-)
+import pytz
+
+load_dotenv()
+
+# Setup logging with local timezone (America/Los_Angeles)
+class TZFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None, tz=None):
+        super().__init__(fmt=fmt, datefmt=datefmt)
+        self.tz = tz
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.datetime.fromtimestamp(record.created, self.tz)
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.isoformat()
+
+local_tz = pytz.timezone('America/Los_Angeles')
+formatter = TZFormatter('%(asctime)s - %(levelname)s - %(message)s', tz=local_tz)
+
+file_handler = logging.FileHandler('/home/greg/repos/sensors/aranet_logger.log')
+file_handler.setFormatter(formatter)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 logger = logging.getLogger(__name__)
 
-# InfluxDB Configuration
-INFLUX_URL = "http://docker20.dbmob.nl:8086"
+# InfluxDB Configuration (from .env file)
+INFLUX_URL = os.environ.get("INFLUX_URL")
 INFLUX_TOKEN = os.environ.get("INFLUXDB_TOKEN")
-INFLUX_ORG = "homelab"
-INFLUX_BUCKET = "aranet4"
+INFLUX_ORG = os.environ.get("INFLUX_ORG")
+INFLUX_BUCKET = os.environ.get("INFLUX_BUCKET")
 
-# Aranet4 Configuration
-ARANET_MAC = "DF:C1:53:75:BA:4E"
-DEVICE_NAME = "aranet4_0B201"
-LOCATION = "office"
+# Aranet4 Configuration (from .env file)
+ARANET_MAC = os.environ.get("ARANET_MAC")
+DEVICE_NAME = os.environ.get("DEVICE_NAME")
+LOCATION = os.environ.get("LOCATION")
 
 # Retry configuration
 MAX_RETRIES = 3
