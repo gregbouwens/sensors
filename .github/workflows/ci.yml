@@ -1,0 +1,44 @@
+name: CI
+
+# Unit tests for the Aranet4 -> InfluxDB job. Runs on the homelab self-hosted
+# repo runner (see github-runner/personal-repos.docker-compose.yml), matching
+# the other protected homelab stacks.
+#
+# Python is pinned to 3.11 to match officepi (Debian 12 aarch64) so CI fails the
+# same way production would.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: Pytest
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      # Catches syntax errors in the BLE adapter, which no test imports (its
+      # dependencies are deliberately absent from requirements-dev.txt).
+      - name: Byte-compile every module
+        run: python -m compileall -q aranet aranet_logger.py
+
+      - name: Run unit tests
+        run: python -m pytest

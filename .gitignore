@@ -1,4 +1,9 @@
 sensors_env/
+.venv/
 *.log
 *.csv
 .env
+
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,0 +1,24 @@
+# Aranet4 -> InfluxDB collection, every 5 minutes, on officepi.
+#
+# Install:  crontab -e   (paste the line below)
+# Verify:   crontab -l
+#
+# Changes from the original line:
+#
+#  * Calls the venv interpreter directly instead of
+#    `/bin/bash -lc 'source ~/.bashrc && source sensors_env/bin/activate && ...'`.
+#    Sourcing an interactive shell profile from cron was the cause of the
+#    "failed cron runs" debugging in this repo's history -- cron has no
+#    interactive shell, so ~/.bashrc's early non-interactive guard could skip
+#    exactly the setup the job depended on. The venv's bin/python3 needs no
+#    activation.
+#
+#  * stdout/stderr still land in cron.log, but the job no longer echoes its
+#    INFO log there -- so cron.log now captures only real crashes instead of
+#    duplicating aranet_logger.log byte for byte (they were 77 MB each).
+#
+# Health is reported to Prometheus through the node_exporter textfile collector
+# (/var/lib/node_exporter/textfile_collector/aranet.prom), not by reading these
+# logs. See observethis alert group `sensors_alerts`.
+
+*/5 * * * * cd $HOME/repos/sensors && sensors_env/bin/python3 aranet_logger.py >> $HOME/repos/sensors/cron.log 2>&1

@@ -1,0 +1,43 @@
+# logrotate policy for the Aranet4 logging job on officepi.
+#
+# Install (from the Mac, per the pull-only host workflow):
+#   ssh officepi 'sudo install -m 0644 -o root -g root \
+#     ~/repos/sensors/deploy/logrotate/aranet-logger /etc/logrotate.d/aranet-logger'
+#   ssh officepi 'sudo logrotate --debug /etc/logrotate.d/aranet-logger'   # dry run
+#
+# Why this exists: the job ran from 2025-08 to 2026-08 with no rotation and no
+# size bound, on a Raspberry Pi SD card. It produced TWO logs of ~77 MB each --
+# aranet_logger.log (Python FileHandler) and cron.log (the shell redirect) --
+# holding byte-for-byte the same INFO lines. The duplicate is fixed in code
+# (logging_setup.configure defaults to file-only); this bounds what remains.
+#
+# Absolute paths are unavoidable in a logrotate config. If the checkout ever
+# moves off /home/greg/repos/sensors, update both stanzas.
+
+/home/greg/repos/sensors/aranet_logger.log {
+    daily
+    rotate 14
+    maxsize 10M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    # The job opens the log fresh on each 5-minute run, but copytruncate makes
+    # rotation safe even if it lands mid-run.
+    copytruncate
+    su greg greg
+}
+
+# Only hard crashes reach this now (tracebacks, config errors on stderr) --
+# routine INFO logging no longer goes to stdout. Kept small on purpose.
+/home/greg/repos/sensors/cron.log {
+    weekly
+    rotate 4
+    maxsize 5M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su greg greg
+}
