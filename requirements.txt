@@ -1,0 +1,6 @@
+# Runtime dependencies for the Aranet4 -> InfluxDB job.
+# Versions match what is installed in sensors_env on officepi (Python 3.11).
+aranet4==2.5.1
+bleak==1.1.0
+influxdb_client==1.49.0
+python-dotenv==1.1.1

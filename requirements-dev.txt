@@ -1,0 +1,13 @@
+# Test-only dependencies.
+#
+# Deliberately does NOT pull in requirements.txt. The pure-stdlib core (config,
+# readings, retry, metrics, job) needs nothing but pytest, and the BLE stack
+# (aranet4, bleak) is never imported by a test -- installing it in CI would add
+# a dbus-shaped failure mode to a suite that does not need it.
+#
+# influxdb_client and urllib3 ARE needed: tests/test_sink.py pins the exact
+# InfluxDB line protocol as a data-continuity guard, and tests/test_retry.py
+# asserts against the real urllib3 exception classes rather than stand-ins.
+pytest==9.1.1
+influxdb_client==1.49.0
+urllib3>=2.0
