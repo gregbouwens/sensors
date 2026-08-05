@@ -75,8 +75,20 @@ officepi is **pull-only** — never edit files on the host. Author on the Mac,
 commit, push, then on officepi:
 
 ```bash
-ssh officepi 'git -C ~/repos/sensors pull --ff-only'
+# ssh -A is REQUIRED: officepi has no GitHub key of its own (~/.ssh holds only
+# authorized_keys), so the pull authenticates through the Mac's forwarded
+# 1Password SSH agent. Without -A the pull fails with the misleading
+# "Please make sure you have the correct access rights and the repository
+# exists" — which reads like the repo is gone, not like an auth problem.
+ssh -A officepi 'git -C ~/repos/sensors pull --ff-only'
 ssh officepi 'cd ~/repos/sensors && sensors_env/bin/pip install -r requirements.txt'
+```
+
+Verify the deploy landed — a successful pull is not proof the job still runs:
+
+```bash
+ssh officepi 'cd ~/repos/sensors && sensors_env/bin/python3 aranet_logger.py; echo "exit=$?"'
+ssh officepi 'cat /var/lib/node_exporter/textfile_collector/aranet.prom'
 ```
 
 Cron line: `deploy/crontab.example`.
