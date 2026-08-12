@@ -17,6 +17,7 @@ so all the interesting failure modes live in parsing. Two are worth naming:
   reports the difference.
 """
 
+import time
 from dataclasses import dataclass, field
 
 MIN_VALID_MOISTURE_PERCENT = 0
@@ -171,6 +172,12 @@ class GatewaySnapshot:
     # "channel 2 has stopped reporting" means walking the house to find out
     # which pot that is.
     channel_names: dict = field(default_factory=dict)
+    # Unix time the gateway was polled. Carried on the snapshot rather than
+    # taken at write time so a RETRIED write reuses it: identical measurement
+    # + tags + timestamp overwrites in InfluxDB instead of appending a second
+    # row. It is also the more truthful stamp -- the probe was read then, not
+    # 20 seconds later when the database finally acknowledged the write.
+    read_at: float | None = None
 
     def reading_for(self, channel):
         for reading in self.channels:
@@ -237,7 +244,7 @@ def _parse_ambient(payload):
     )
 
 
-def parse_livedata(payload, *, expected_channels, channel_names=None):
+def parse_livedata(payload, *, expected_channels, channel_names=None, read_at=None):
     """Turn one /get_livedata_info response into a validated GatewaySnapshot.
 
     An empty `ch_ec` is a valid snapshot with every channel missing, NOT an
@@ -259,4 +266,5 @@ def parse_livedata(payload, *, expected_channels, channel_names=None):
         expected_channels=tuple(expected_channels),
         ambient=_parse_ambient(payload),
         channel_names=dict(channel_names),
+        read_at=time.time() if read_at is None else read_at,
     )

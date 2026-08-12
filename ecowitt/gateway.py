@@ -18,6 +18,7 @@ anything.
 
 import json
 import socket
+import time
 import urllib.error
 import urllib.request
 
@@ -60,15 +61,18 @@ class EcowittGateway:
     retryable_errors = GATEWAY_RETRYABLE_ERRORS
     description = "read the Ecowitt gateway"
 
-    def __init__(self, config, fetch=fetch_json):
+    def __init__(self, config, fetch=fetch_json, clock=time.time):
         self._config = config
         self._fetch = fetch
+        self._clock = clock
 
     def read(self):
         """Return a validated GatewaySnapshot, or raise."""
+        read_at = self._clock()
         payload = self._fetch(self._config.livedata_url, self._config.timeout_seconds)
         return parse_livedata(
             payload,
             expected_channels=self._config.expected_channels,
             channel_names=self._config.channel_names,
+            read_at=read_at,
         )
