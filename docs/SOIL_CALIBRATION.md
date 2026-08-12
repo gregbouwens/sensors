@@ -1,11 +1,62 @@
 # Calibrating the soil probes before trusting a "thirsty" alert
 
-**Status 2026-08-12: not yet done. No moisture threshold alert should ship until
-it is.** This file is the runbook.
+**Status 2026-08-12: step 2 is DONE — the probes are proven good and the dry
+endpoint is real. Step 3 (the dry-down curve) is in progress.** Still no
+moisture threshold alert until it finishes. This file is the runbook.
 
-## Why not just pick 20%?
+## Result of step 2 (2026-08-12, 15:12)
 
-Because we cannot currently tell these two apart:
+Tracy watered the larger of the two plants — channel 1 — and the question this
+document was written to answer settled itself in a single 5-minute poll:
+
+```text
+time      ch1 moisture  ch1 EC      ch2 moisture  ch2 EC     (ch2 = control)
+22:07     11%           0 uS/cm     11%           0 uS/cm
+22:12     64%           70 uS/cm    11%           0 uS/cm
+```
+
+Three things fell out of that at once:
+
+- **The probes work.** 11% → 64% in one interval.
+- **EC rose off zero**, which is the independent confirmation. Conductivity
+  needs moisture to conduct, so it cannot rise unless water actually reached the
+  probe. Two different physical quantities moved together, which no calibration
+  artifact would produce.
+- **The unwatered pot did not move.** Channel 2 stayed at 11% with EC 0
+  throughout — an unplanned but perfect control, ruling out shared drift, a
+  gateway-wide artifact, or a units bug.
+
+**So 11% was genuine dryness, not a bad install and not a factory-calibration
+artifact.** The hypothesis below was real and is now closed.
+
+### What the settling curve says
+
+Twenty minutes later channel 1 read **48%** and falling. The 64% spike is
+saturation at the moment of watering, not the number to calibrate against:
+
+> **Use the SETTLED value after the pot has drained (roughly an hour), not the
+> peak.** The peak is water still on its way through, and anchoring a threshold
+> to it would set every trigger too high.
+
+### Measured endpoints so far
+
+| | Channel 1 (larger plant) | Channel 2 (control) |
+| --- | --- | --- |
+| dry plateau | 11% (stable ~1h before watering) | 11% |
+| saturation peak | 64%, EC 70 µS/cm | — |
+| 20 min after | 48% | — |
+| settled / field capacity | **still measuring** | — |
+| days wet → dry | **still measuring** | — |
+
+Step 3 is now just watching. The two remaining unknowns — the settled wet value
+and how many days the dry-down takes — are exactly what turns a threshold from a
+guess into a number, and what makes *"will they last until we are home?"*
+answerable.
+
+## Why we did not just pick 20%
+
+Kept because it is the reasoning, and because the same question will come up for
+the next probe added. Before the watering above, we could not tell these apart:
 
 - the soil genuinely is very dry, or
 - the probes are reading low because of where they sit or how they are calibrated.
@@ -44,7 +95,7 @@ week of data that a bad install would invalidate.
   that dries first.
 - Nothing pushed so far it sits in the drainage layer.
 
-### 2. Establish the WET endpoint (the discriminating test)
+### 2. Establish the WET endpoint (the discriminating test) — DONE 2026-08-12
 
 Water one pot thoroughly and watch what the number does. **This is the test that
 distinguishes the two hypotheses**, and it settles the question in about an hour:
@@ -84,8 +135,15 @@ answerable at all.
 
 Sensible starting rule once you have real endpoints:
 
-> alert at roughly **⅓ of the way from the dry plateau up to the watered peak**,
-> and require it to hold for a few hours so a single odd reading cannot page.
+> alert at roughly **⅓ of the way from the dry plateau up to the SETTLED wet
+> value**, and require it to hold for a few hours so a single odd reading cannot
+> page.
+
+With channel 1's dry plateau at 11%, that puts the threshold somewhere in the
+low-to-mid 20s once the settled value is known — but do not hard-code that from
+this paragraph. Read it off the curve, and set it **per channel**: the two pots
+are different sizes and will not dry at the same rate. `ECOWITT_CHANNELS` names
+them, so the rule can say the plant's name.
 
 Then translate to a Prometheus rule in `observethis/config/alert_rules.yml`,
 with promtool tests, and both directions tested — it fires when it should, and
