@@ -11,7 +11,7 @@ runs hard-failed instead of retrying.
 import pytest
 from urllib3.exceptions import MaxRetryError, NewConnectionError
 
-from aranet.retry import RetryExhausted, retry_call
+from sensorcore.retry import RetryExhausted, retry_call
 
 
 class Recorder:

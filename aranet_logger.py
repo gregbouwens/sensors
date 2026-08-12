@@ -20,7 +20,7 @@ from aranet import metrics
 from aranet.config import DEFAULT_TEXTFILE_DIR, ENV_TEXTFILE_DIR, Config, ConfigError
 from aranet.exit_codes import EXIT_CONFIG_ERROR
 from aranet.job import run
-from aranet.logging_setup import configure
+from sensorcore.logging_setup import configure
 from aranet.sensor import Aranet4Sensor
 from aranet.sink import InfluxSink
 
