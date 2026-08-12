@@ -35,6 +35,16 @@ Bucket `sensors`, two measurements:
 `plant` is set from `ECOWITT_CHANNELS` in `.env`, so naming a channel there makes
 every query and every alert read in plain English instead of channel numbers.
 
+**`plant` is a TAG, so renaming one starts a NEW series.** Readings from before
+the rename keep the old value, and a graph spanning the change shows two lines
+rather than one. `channel` never changes, so:
+
+> **group by `channel` for continuity; use `plant` for display.**
+
+This repo renamed channels 1 and 2 from `channel 1`/`channel 2` to
+`Big Plant`/`Little Plant` on 2026-08-12 at ~16:03 — including the first
+watering-response measurement, which lives under the old tag.
+
 ## Grafana (what you actually want most of the time)
 
 <http://docker21.dbmob.nl:3000> → Explore → InfluxDB datasource → bucket `sensors`.
