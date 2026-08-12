@@ -35,15 +35,41 @@ Bucket `sensors`, two measurements:
 `plant` is set from `ECOWITT_CHANNELS` in `.env`, so naming a channel there makes
 every query and every alert read in plain English instead of channel numbers.
 
-**`plant` is a TAG, so renaming one starts a NEW series.** Readings from before
-the rename keep the old value, and a graph spanning the change shows two lines
-rather than one. `channel` never changes, so:
+**`plant` is a TAG, so renaming one starts a NEW series.** InfluxDB cannot update
+a tag in place — it is part of the series key. Readings written before a rename
+keep the old value, and a graph spanning the change shows two lines rather than
+one. `channel` never changes, so as a general habit:
 
 > **group by `channel` for continuity; use `plant` for display.**
 
-This repo renamed channels 1 and 2 from `channel 1`/`channel 2` to
-`Big Plant`/`Little Plant` on 2026-08-12 at ~16:03 — including the first
-watering-response measurement, which lives under the old tag.
+Channels 1 and 2 were renamed from `channel 1`/`channel 2` to
+`Big Plant`/`Little Plant` on 2026-08-12 ~16:03, and the old history **was
+backfilled**, so there is no split in this bucket. If you rename again, the
+recipe is below.
+
+### Backfilling a tag rename
+
+Rewrite-then-delete, and **verify before deleting** — the delete is the only
+irreversible step:
+
+1. **Export the old-tagged points to a local file.** This is the backup; do not
+   skip it.
+2. **Generate line protocol with the new tag**, preserving the exact nanosecond
+   timestamps and the **field types**. Integer fields must stay integers
+   (`moisture=11i`, `battery_level=5i`) — InfluxDB pins a field's type on first
+   write and rejects a later write of a different type. Escape spaces in tag
+   values (`plant=Big\ Plant`).
+3. **Write it**, then **count both tags and spot-check a known value** before
+   going near the delete API.
+4. **Delete by predicate**, scoped to the measurement AND the old tag:
+   `_measurement="ecowitt_soil_readings" AND plant="channel 1"`.
+   Watch the `stop` boundary — a `stop` earlier than the newest old-tagged point
+   silently leaves survivors, which is exactly what happened here on the first
+   pass (5 points per channel, just past the boundary).
+5. **Verify by COUNTING POINTS, not by listing tag values.**
+   `schema.tagValues()` reads the series index and keeps showing a deleted tag
+   until compaction, so it reports the rename as having failed when it worked.
+   Count points grouped by tag instead.
 
 ## Grafana (what you actually want most of the time)
 
