@@ -9,6 +9,7 @@ expected channel whether it answered or not.
 
 import json
 import pathlib
+from dataclasses import replace
 
 import pytest
 
@@ -229,3 +230,68 @@ def test_a_snapshot_with_no_reporting_probes_produces_no_points():
     )
 
     assert points == []
+
+
+# ── Idempotency: a retried write must not duplicate the reading ─────────────
+
+
+def test_a_retried_write_reuses_the_read_timestamp_rather_than_restamping():
+    """Observed in production on the very first run, 2026-08-12.
+
+    The InfluxDB write timed out client-side after 10s, the retry succeeded --
+    but the server had ALREADY accepted the first write. Because the sink
+    stamped each attempt with time.now(), the retry landed as a SECOND point
+    15s later, and one reading became two rows in the history.
+
+    Stamping the snapshot when it is READ makes the write idempotent: identical
+    measurement + tags + timestamp overwrites in InfluxDB instead of appending.
+    It is also more truthful -- the reading happened when the probe was read,
+    not 20 seconds later when the database finally acknowledged it.
+    """
+    from ecowitt.sink import InfluxSink
+
+    class FakeConfig:
+        device_name = "ecowitt-gw1200b"
+        location = "houseplants"
+
+    snap = snapshot()
+    assert snap.read_at is not None, "a snapshot must know when it was read"
+
+    sink = InfluxSink(FakeConfig())
+    first = [p.to_line_protocol() for p in sink.points_for(snap)]
+    retry = [p.to_line_protocol() for p in sink.points_for(snap)]
+
+    assert first == retry, "a retried write must land on the same point"
+
+
+def test_the_sink_builds_identical_points_on_every_attempt():
+    """The real sink, not a stand-in: two attempts must be byte-identical."""
+    from ecowitt.sink import InfluxSink
+
+    class FakeConfig:
+        device_name = "ecowitt-gw1200b"
+        location = "houseplants"
+
+    sink = InfluxSink(FakeConfig())
+    snap = snapshot()
+
+    first = [p.to_line_protocol() for p in sink.points_for(snap)]
+    second = [p.to_line_protocol() for p in sink.points_for(snap)]
+
+    assert first == second
+    assert first, "a snapshot with two probes must produce points"
+
+
+def test_a_snapshot_read_at_a_known_time_stamps_points_at_that_time():
+    from ecowitt.sink import InfluxSink
+
+    class FakeConfig:
+        device_name = "d"
+        location = "l"
+
+    snap = snapshot()
+    stamped = replace(snap, read_at=1785772800.0)
+
+    line = InfluxSink(FakeConfig()).points_for(stamped)[0].to_line_protocol()
+
+    assert line.endswith(" 1785772800000000000"), line

@@ -14,6 +14,7 @@ type, so moisture and battery_level must stay integers forever.
 """
 
 import datetime
+import time
 
 import urllib3.exceptions
 from influxdb_client import InfluxDBClient, Point
@@ -84,16 +85,31 @@ class InfluxSink:
         self._config = config
 
     @staticmethod
-    def _now():
-        return datetime.datetime.now(datetime.timezone.utc)
+    def _timestamp_for(snapshot):
+        """When the probes were READ, not when we got around to writing them.
 
-    def write(self, snapshot):
-        points = build_points(
+        This is what makes a retry idempotent. On 2026-08-12 the very first
+        write timed out client-side after 10s and was retried -- but InfluxDB
+        had already accepted it, so stamping the retry with a fresh clock read
+        turned one reading into two rows 15 seconds apart. Reusing the read
+        timestamp means the retry overwrites the same point instead.
+        """
+        read_at = getattr(snapshot, "read_at", None)
+        if read_at is None:
+            read_at = time.time()
+        return datetime.datetime.fromtimestamp(read_at, datetime.timezone.utc)
+
+    def points_for(self, snapshot):
+        """Every point for a snapshot. Deterministic: same input, same output."""
+        return build_points(
             snapshot,
             device_name=self._config.device_name,
             location=self._config.location,
-            timestamp=self._now(),
+            timestamp=self._timestamp_for(snapshot),
         )
+
+    def write(self, snapshot):
+        points = self.points_for(snapshot)
 
         # A snapshot where every probe is silent is a legitimate outcome -- the
         # gateway answered, the probes did not. There is nothing to write, and
