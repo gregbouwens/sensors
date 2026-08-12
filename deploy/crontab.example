@@ -22,3 +22,14 @@
 # logs. See observethis alert group `sensors_alerts`.
 
 */5 * * * * cd $HOME/repos/sensors && sensors_env/bin/python3 aranet_logger.py >> $HOME/repos/sensors/cron.log 2>&1
+
+# ── Ecowitt GW1200B soil probes -> InfluxDB, every 5 minutes, on officepi ─────
+#
+# Offset by 2 minutes from the Aranet4 line above so the two jobs do not both
+# wake a Raspberry Pi 3B at :00/:05/:10. They are independent; nothing breaks if
+# they overlap, but staggering keeps the load flat and the logs readable.
+#
+# The gateway is polled over HTTP across the VLAN boundary to Arlo. It answers
+# in ~70ms, so this run is far quicker than the Bluetooth one.
+
+2-59/5 * * * * cd $HOME/repos/sensors && sensors_env/bin/python3 ecowitt_logger.py >> $HOME/repos/sensors/cron.log 2>&1
