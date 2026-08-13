@@ -5,14 +5,24 @@ question you are asking.
 
 | | InfluxDB | Prometheus |
 | --- | --- | --- |
-| Holds | full history, every 5 min, forever | the **latest** value only |
+| Holds | full-fidelity readings, every 5 min, **infinite** retention | the same readings resampled at scrape rate, **365d** retention, plus job health |
 | Written by | the collector, directly | node_exporter scraping `*.prom` |
-| Use it for | "how has this pot dried out over 3 weeks?" | alerting, "is it OK right now?" |
+| Use it for | the readings themselves; long-range trends | alerting, job health, and **"is a probe silent?"** |
 | Query language | Flux | PromQL |
 | Where | `docker20.dbmob.nl:8086`, bucket `sensors` | `docker21.dbmob.nl:9090` |
 
-The short version: **Grafana for looking, Prometheus for alerting, InfluxDB for
-history.**
+**Both are wired into Grafana** (datasources `influxdb` and `prometheus`), and the
+split is by purpose rather than preference:
+
+- **Readings → InfluxDB.** It is the system of record: exact 5-minute values,
+  kept forever.
+- **Health, and anything about a probe being SILENT → Prometheus.** This is not
+  a style choice. When a probe's battery dies the collector writes **no row at
+  all** to InfluxDB, so absence *is* the failure — and you cannot plot a row that
+  was never written. `ecowitt_channel_reporting` exists in Prometheus precisely
+  to carry an explicit `0`. Health panels also belong there because that is what
+  the **alert rules** evaluate; sourcing them elsewhere lets a dashboard disagree
+  with the alerts mid-incident.
 
 ## The data model
 
@@ -73,10 +83,19 @@ irreversible step:
 
 ## Grafana (what you actually want most of the time)
 
-<http://docker21.dbmob.nl:3000> → Explore → InfluxDB datasource → bucket `sensors`.
+**Dashboard: "Houseplants — Ecowitt soil probes"** (uid `houseplants-soil`), at
+<http://docker21.dbmob.nl:3000>. Provisioned from
+`observethis/config/grafana/provisioning/dashboards/houseplants-soil.json` — the
+file is the source of truth and UI edits to it cannot be saved, on purpose.
 
-Paste a Flux query from below, or use the query builder. For a dashboard panel
-of soil moisture over time, the first query is the one you want.
+For ad-hoc work: Explore → **InfluxDB** datasource → paste a Flux query from
+below. (Corrected 2026-08-13: an earlier version of this file said to use an
+InfluxDB datasource that **did not exist yet** — Grafana had only Prometheus and
+Loki. It was added along with the dashboard, with a read-only token.)
+
+Login is the `service-admin` account; its password is
+`op://Homelab/Grafana Service Admin/password`. The older `admin` account still
+exists but is *not* a Grafana server admin and is not part of this flow.
 
 ## Flux, against InfluxDB
 
@@ -156,9 +175,11 @@ curl -s -H "Authorization: Token $INFLUXDB_TOKEN" \
 
 ## PromQL, against Prometheus
 
-Prometheus holds only the newest value, because it scrapes the `.prom` file the
-collector rewrites each run. That makes it the right place for *alerting* and the
-wrong place for history.
+Prometheus scrapes the `.prom` file the collector rewrites each run, so it holds
+a real 365-day time series — not just the newest value. What it does *not* have
+is the collector's exact write cadence: between the collector's 5-minute updates
+the scraped value simply repeats. For the readings themselves prefer InfluxDB;
+use Prometheus for alerting, job health, and the silent-probe signal.
 
 ```promql
 # current soil moisture, per plant
